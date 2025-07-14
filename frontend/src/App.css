@@ -1,0 +1,19 @@
+@keyframes blinkBlur {
+  0% {
+    opacity: 1;
+    filter: blur(0px);
+  }
+  50% {
+    opacity: 0.5;
+    filter: blur(4px);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0px);
+  }
+}
+
+.blink-blur {
+  animation: blinkBlur 1.5s infinite;
+}
+
