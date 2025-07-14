@@ -5,6 +5,7 @@ const {
   getHistory,
   getAlertsByEmail,
   aiPredict,
+  askAI,
 } = require("../controllers/stockController");
 const router = express.Router();
 
@@ -13,5 +14,6 @@ router.post("/alert", setStockLimit);
 router.get("/alert/:email", getAlertsByEmail);
 router.get("/graph/:symbol", getHistory);
 router.post("/ai/predict", aiPredict);
+router.post("/ask/ai", askAI);
 
 module.exports = router;

@@ -197,10 +197,36 @@ const aiPredict = async (req, res) => {
   }
 };
 
+const askAI = async (req, res) => {
+  const { question } = req.body;
+  if (!question)
+    return res.status(400).json({ result: "No question provided" });
+
+  try {
+    const body = {
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: question }],
+        },
+      ],
+      generationConfig: { temperature: 0.7 },
+    };
+
+    const response = await axios.post(GEMINI_URL, body, { headers });
+    const text = response?.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    res.json({ result: text || "No answer found." });
+  } catch (err) {
+    res.status(500).json({ result: "AI Error: " + err.message });
+  }
+};
+
+
 module.exports = {
   getStockPrice,
   setStockLimit,
   getAlertsByEmail,
   getHistory,
   aiPredict,
+  askAI,
 };
