@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getApiBase } from "../utils/getAPIBase.js";
+import { MutatingDots } from "react-loader-spinner";
 
 const API_BASE = getApiBase();
 
@@ -11,6 +12,7 @@ const AIPrediction = ({ stock }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [answer, setAnswer] = useState("");
   const [followQ, setFollowQ] = useState("");
+  const [answerLoading, setAnswerLoading] = useState(false);
 
   const fetchAI = async () => {
     if (!stock) return;
@@ -26,7 +28,7 @@ const AIPrediction = ({ stock }) => {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setAiData(data);
-    } catch (err) {
+    } catch {
       setError("AI prediction failed. Try again.");
     } finally {
       setLoading(false);
@@ -35,6 +37,8 @@ const AIPrediction = ({ stock }) => {
 
   const askAI = async (q = question) => {
     if (!q.trim()) return;
+    setAnswerLoading(true);
+    setModalOpen(true);
     try {
       const res = await fetch(`${API_BASE}/stock/ask/ai`, {
         method: "POST",
@@ -43,10 +47,10 @@ const AIPrediction = ({ stock }) => {
       });
       const data = await res.json();
       setAnswer(data.result || "No answer received.");
-      setModalOpen(true);
     } catch {
       setAnswer("Something went wrong. Try again.");
-      setModalOpen(true);
+    } finally {
+      setAnswerLoading(false);
     }
   };
 
@@ -55,7 +59,7 @@ const AIPrediction = ({ stock }) => {
   }, [stock]);
 
   const formatAIResponse = (text) => {
-    const lines = text.trim().split("\n");
+    const lines = text.trim().split("\n").filter(Boolean);
     const elements = [];
     let i = 0;
 
@@ -63,16 +67,11 @@ const AIPrediction = ({ stock }) => {
       const line = lines[i].trim();
       const next = lines[i + 1]?.trim() || "";
 
-      if (
-        /^\*\*(.+?)\*\*$/.test(line) &&
-        next.length > 0 &&
-        !/^\*\*/.test(next)
-      ) {
+      if (/^\*\*(.+?): \*$/.test(line)) {
+        const heading = line.match(/^\*\*(.+?): \*$/)?.[1]?.trim();
         elements.push(
           <div key={i} className="mt-4">
-            <div className="font-bold text-base text-gray-800">
-              {line.replace(/\*\*/g, "")}
-            </div>
+            <div className="font-bold italic text-gray-900">{heading}:</div>
             <div className="text-sm text-gray-700 mt-1">
               {parseStyledText(next)}
             </div>
@@ -85,17 +84,16 @@ const AIPrediction = ({ stock }) => {
             {parseStyledText(line)}
           </div>,
         );
-        i += 1;
+        i++;
       }
     }
-
     return elements;
   };
 
   const parseStyledText = (line) => {
     const tokens = [];
     let pattern =
-      /(\*\*(.+?)\*\*|\*(.+?)\*|₹\d+(\.\d+)?|\bbuy\b|\bsell\b|\bhold\b)/gi;
+      /(\*\*(.+?)\*\*|\*(.+?)\*|\u20B9\d+(\.\d+)?|\bbuy\b|\bsell\b|\bhold\b)/gi;
     let last = 0;
     let match;
 
@@ -104,22 +102,19 @@ const AIPrediction = ({ stock }) => {
       if (before) tokens.push(before);
 
       const raw = match[0];
-
       if (/^\*\*(.+?)\*\*$/.test(raw)) {
-        const boldText = raw.replace(/\*\*/g, "");
         tokens.push(
           <span key={match.index} className="font-semibold text-gray-800">
-            {boldText}
+            {raw.replace(/\*\*/g, "")}
           </span>,
         );
       } else if (/^\*(.+?)\*$/.test(raw)) {
-        const italicText = raw.replace(/\*/g, "");
         tokens.push(
           <span key={match.index} className="italic text-gray-600">
-            {italicText}
+            {raw.replace(/\*/g, "")}
           </span>,
         );
-      } else if (/₹\d+(\.\d+)?/.test(raw)) {
+      } else if (/\u20B9\d+(\.\d+)?/.test(raw)) {
         tokens.push(
           <span key={match.index} className="text-green-600 font-medium">
             {raw}
@@ -150,64 +145,27 @@ const AIPrediction = ({ stock }) => {
           </span>,
         );
       }
-
       last = pattern.lastIndex;
     }
-
     const remaining = line.slice(last);
     if (remaining) tokens.push(remaining);
-
     return tokens;
   };
 
-  const formatStockNote = (text) => {
-    const lines = text.trim().split("\n").filter(Boolean);
-    return lines.map((line, i) => {
-      const match = line.match(/^(.+?)\:\*(.+)$/);
-      if (match) {
-        return (
-          <div key={i} className="mb-1">
-            <span className="font-medium text-gray-800">
-              {match[1].trim()}:
-            </span>{" "}
-            <span className="text-gray-600">{match[2].trim()}</span>
-          </div>
-        );
-      }
-      return (
-        <div key={i} className="text-gray-700">
-          {line}
-        </div>
-      );
-    });
-  };
-
   return (
-    <div className="p-6 bg-white rounded-lg shadow-md mt-6 space-y-6 relative">
+    <div className="p-6 bg-white rounded-lg shadow-md mt-6 space-y-6">
       <h2 className="text-xl font-bold text-secondary">AI Stock Prediction</h2>
 
       {loading && (
-        <div className="space-y-6">
-          <div className="h-6 bg-gray-200 rounded w-1/3 animate-pulse"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {[...Array(2)].map((_, i) => (
-              <div key={i} className="space-y-2">
-                <div className="h-4 bg-gray-300 w-1/2 rounded animate-pulse"></div>
-                <div className="h-3 bg-gray-200 w-full rounded animate-pulse"></div>
-                <div className="h-3 bg-gray-200 w-5/6 rounded animate-pulse"></div>
-              </div>
-            ))}
-          </div>
-          <div className="bg-gray-100 p-4 rounded space-y-2 animate-pulse">
-            <div className="h-4 bg-gray-200 w-1/3 rounded"></div>
-            <div className="h-3 bg-gray-200 w-2/3 rounded"></div>
-            <div className="h-3 bg-gray-200 w-1/2 rounded"></div>
-          </div>
-          <div className="bg-gray-100 p-4 rounded space-y-2 animate-pulse">
-            <div className="h-4 bg-gray-200 w-1/2 rounded"></div>
-            <div className="h-3 bg-gray-200 w-full rounded"></div>
-            <div className="h-3 bg-gray-200 w-5/6 rounded"></div>
-          </div>
+        <div className="flex justify-center items-center h-40">
+          <MutatingDots
+            height={100}
+            width={100}
+            color="#69A79C"
+            secondaryColor="#ff0000"
+            radius={12.5}
+            visible={true}
+          />
         </div>
       )}
 
@@ -264,13 +222,13 @@ const AIPrediction = ({ stock }) => {
             <p>
               <strong>Best Buy Price:</strong>{" "}
               <span className="text-green-600 font-semibold">
-                ₹{aiData.bestBuyPrice || "N/A"}
+                ₹{aiData.bestBuyPrice}
               </span>
             </p>
             <p>
               <strong>Best Sell Price:</strong>{" "}
               <span className="text-green-600 font-semibold">
-                ₹{aiData.bestSellPrice || "N/A"}
+                ₹{aiData.bestSellPrice}
               </span>
             </p>
           </div>
@@ -295,7 +253,7 @@ const AIPrediction = ({ stock }) => {
 
       {modalOpen && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-xl h-[400px] relative shadow-xl flex flex-col">
+          <div className="bg-white rounded-xl p-6 w-full max-w-xl h-[400px] relative shadow-xl flex flex-col overflow-hidden">
             <button
               className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 text-lg"
               onClick={() => setModalOpen(false)}
@@ -305,10 +263,21 @@ const AIPrediction = ({ stock }) => {
             <h3 className="text-lg font-bold mb-2 text-secondary">
               AI Response
             </h3>
-            <div className="flex-1 overflow-y-scroll scrollbar-thin pr-2">
-              {answer.includes(":*")
-                ? formatStockNote(answer)
-                : formatAIResponse(answer)}
+            <div className="flex-1 overflow-y-auto pr-2 hide-scrollbar">
+              {answerLoading ? (
+                <div className="flex justify-center items-center h-full">
+                  <MutatingDots
+                    height={100}
+                    width={100}
+                    color="#69A79C"
+                    secondaryColor="#ff0000"
+                    radius={12.5}
+                    visible={true}
+                  />
+                </div>
+              ) : (
+                formatAIResponse(answer)
+              )}
             </div>
             <div className="mt-4 pt-2 border-t">
               <input
